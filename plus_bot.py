@@ -71,18 +71,19 @@ def echo(update: Update, context: CallbackContext) -> None:
             username = getattr(update.message.reply_to_message.from_user,'username', None)
             first_name = getattr(update.message.reply_to_message.from_user,'first_name',None)
             last_name = getattr(update.message.reply_to_message.from_user,'last_name',None)
-            logger.info(f"Reply to ID:{reply_to_id}, {username} {first_name} {last_name}")
+            logger.info(f"Reply to ID:{reply_to_id}, @{username} Name: {first_name} {last_name}")
             first_char = update.message.text[0]
             commands = {"+":"Plus",
                         "-":"Minus"}
             if first_char in commands.keys():
                 if reply_to_id == 1968168927:
                     # +/- to bot
-                    update.message.reply_text(f"Thank you! But I am not *that* type...\nBut I like jokes.\n{pyj.get_joke()}")
+                    update.message.reply_text(f"Thank you! I am not *that* type...\nBut I like jokes.\n{pyj.get_joke()}")
                     return
                 if reply_to_id == from_user_id:
-                    # Self plusing
-                    update.message.reply_text("That is a self-satisfaction... disgusting!")    
+                    # Self "plus"-ing
+                    joke = pyj.get_joke(language = 'en', category = 'chuck')
+                    update.message.reply_text(f"I like you too...Are you Chuck?\n{joke}")    
                     return
                 # Read database
                 try:
@@ -91,27 +92,44 @@ def echo(update: Update, context: CallbackContext) -> None:
                     logger.error(f"{e}")
                     database = {1968168927:0}
                 # print(database.items())
+                
                 ## Update rating
                 current_rating = database.get(str(reply_to_id),0)
-                last_update = int(database.get(f"{reply_to_id}_update",0))
-                logger.info(f"Read: {reply_to_id}, previous rating: {current_rating} at {last_update}")
+                # last_update = int(database.get(f"{reply_to_id}_update",0))
+                logger.info(f"Read: {reply_to_id}, previous rating: {current_rating}")
                 current_rating = eval(f"{current_rating}{first_char}1")
-                current_time = int(dt.datetime.utcnow().strftime('%s'))
+                
+                ## Make a delay 
+                current_time = int(dt.datetime.utcnow().strftime('%s')) # Time Now
+                try:
+                    with open("recent_appreciations.json", "r+") as f: recents = json.load(f);
+                except Exception as e:
+                    logger.error(f"{e}")
+                    recents = {}
+                ## filter out old appreciations (>60 sec)
+                new_recents = {k:v for k,v in recents.items() if (current_time-int(k)) <= 60}
+                # Search for pair
+                for k,v in new_recents.items():
+                    if (str(from_user_id) in v.keys()) and (reply_to_id == v.get(str(from_user_id), None)):
+                        update.message.reply_text("Wait a little!")
+                        logger.info(f"Not updated: {from_user_id}->{reply_to_id} => Pause difference: {current_time-int(k)}")
+                        return
+                ## add a new appreciation to stack
+                if current_time not in new_recents.keys():
+                    new_recents[current_time] = {}
+                new_recents[current_time][from_user_id] = reply_to_id
+                with open("recent_appreciations.json", "w") as f: recents = json.dump(new_recents,f);
                 database[str(reply_to_id)] = current_rating
-                database[f"{reply_to_id}_update"] = current_time
-                difference = current_time-last_update
-                if difference <60:
-                    update.message.reply_text("Wait a little!")
-                    return
-                logger.info(f"Pause difference {current_time-last_update}")
-                ## Write database 
+                
+                
+                ## Write database if everything is okay!
                 with open("user_data_base.json","w") as f: json.dump(database, f);
                 reply_text = f"{commands[first_char]} one social credit to {first_name}. (@{username}) Total rating: {current_rating}"
                 update.message.reply_text(reply_text, quote=False)
                 return
 
     except Exception as e:
-        update.message.reply_text(f"I am not feeleing well...\n")
+        update.message.reply_text(f"I am not feeling well...\n")
         logger.error(f"{e}")
     return
 
