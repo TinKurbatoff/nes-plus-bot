@@ -64,6 +64,9 @@ def echo(update: Update, context: CallbackContext) -> None:
     try:
         from_user = getattr(update.message,'from_user', None)
         from_user_id = getattr(from_user,'id', None)
+        if not getattr(update,'message', None):
+            logger.warning("Empty message")
+            return
         reply = getattr(update.message.reply_to_message,'from_user', None)
         if reply:
             ## React only to replies...
