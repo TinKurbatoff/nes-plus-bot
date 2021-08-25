@@ -252,6 +252,27 @@ def about(update: Update, context: CallbackContext) -> None:
     from_user = getattr(update.message,'from_user', None)
     logger.info(f"/About called by {from_user}.")
     username = getattr(from_user,'username', None)
+    if len(update.message.entities)>0:
+        ## INFO: https://core.telegram.org/bots/api#messageentity
+        logger.info(f"Entities: {update.message.entities[0]}")
+        if update.message.entities[0]['type'] == 'bot_command':
+            message_full = getattr(update.message,'text', None)
+            message_list = message_full.split(" ")
+            logger.info(f"message_list: {message_list}")
+            rating = None
+            m_name = None
+            for text_part in message_list:
+                if text_part[0] == "@":
+                    m_name = text_part[1:]
+                    logger.info(f" Tagged: {m_name}")
+                    rating = get_user_rating(username=m_name)
+            if rating:
+                update.message.reply_text(f'User @{m_name} has rating {rating:0,.0f}')        
+                return
+            elif m_name:
+                update.message.reply_text(f'Who is @{m_name}, eh?')
+                return
+                                    
     if username == 'banknote2000':
         users = read_user_database(USER_PANDAS_DATABASE)
         # joke = HTML_with_style(users, '<style>table {{{}}}</style>'.format(my_style))
