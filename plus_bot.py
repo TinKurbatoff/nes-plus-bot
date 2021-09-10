@@ -39,6 +39,13 @@ USER_PANDAS_DATABASE = "users_database.pandas"
 COMMANDS = {"+":"Plus",
             "-":"Minus"}
 
+RATING_COMMANDS = {    
+    "👍":"+",
+    "👎":"-",
+    "🙂":"+",
+    "🙁":"-",
+} 
+
 # Enable logging
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO
@@ -250,9 +257,10 @@ def about(update: Update, context: CallbackContext) -> None:
     """Send a message when the command /help is issued."""
     # joke = pyj.get_joke(language = 'en', category = 'all')
     from_user = getattr(update.message,'from_user', None)
+    entities = getattr(update.message,'entities', [])
     logger.info(f"/About called by {from_user}.")
     username = getattr(from_user,'username', None)
-    if len(update.message.entities)>0:
+    if len(entities)>0:
         ## INFO: https://core.telegram.org/bots/api#messageentity
         logger.info(f"Entities: {update.message.entities[0]}")
         if update.message.entities[0]['type'] == 'bot_command':
@@ -264,7 +272,7 @@ def about(update: Update, context: CallbackContext) -> None:
             for text_part in message_list:
                 if text_part[0] == "@":
                     m_name = text_part[1:]
-                    logger.info(f" Tagged: {m_name}")
+                    logger.info(f"==>> Tagged: {m_name}")
                     rating = get_user_rating(username=m_name)
             if rating:
                 update.message.reply_text(f'User @{m_name} has rating {rating:0,.0f}')        
@@ -276,11 +284,19 @@ def about(update: Update, context: CallbackContext) -> None:
     if username == 'banknote2000':
         users = read_user_database(USER_PANDAS_DATABASE)
         # joke = HTML_with_style(users, '<style>table {{{}}}</style>'.format(my_style))
-        joke = users.to_string(header=True, index=False)
-
+        # split dataframe on parts by 30 records
+        for part in range(1, len(users)//30+2):
+            from_line = part*30-30
+            to_line = part*30
+            logger.info(f"==== PART {part} ====")
+            logger.info(f"lines from {from_line} to {to_line}")
+            users_part = users.iloc[from_line:to_line,:].to_string(header=True, index=False)
+            update.message.reply_text(f"==== PART {part} ====\nfrom {from_line} to {to_line}\n{users_part}")
+        return
     else:
         joke = "No joke. It is not funny."
-    update.message.reply_text(f'I like jokes.\n{joke}')
+        update.message.reply_text(f'I like jokes.\n{joke}')
+        return
 
 def change(update: Update, context: CallbackContext) -> None:
     """Send a message when the command /help is issued."""
@@ -419,6 +435,8 @@ def echo(update: Update, context: CallbackContext) -> None:
                 logger.info(f" Tagged: {m_name}")
                 message_text = getattr(update.message,'text',None)
                 first_char = message_text[0]
+                if first_char in RATING_COMMANDS.keys():
+                    first_char = RATING_COMMANDS[first_char]
                 if (message_text) and (first_char in commands.keys()):
                     logger.info("+ @user appreciation detected...")
                     update_rating_routine(update, first_char=first_char, 
@@ -440,6 +458,8 @@ def echo(update: Update, context: CallbackContext) -> None:
             update_user_db(user_id=reply_to_id, username=username, first_name=first_name, last_name=last_name)
             logger.info(f"Reply to ID:{reply_to_id}, @{username} Name: {first_name} {last_name}")
             first_char = update.message.text[0]
+            if first_char in RATING_COMMANDS.keys():
+                first_char = RATING_COMMANDS[first_char]            
             if first_char in commands.keys():
                 update_rating_routine(update, first_char=first_char, 
                             from_user_id=from_user_id, 
