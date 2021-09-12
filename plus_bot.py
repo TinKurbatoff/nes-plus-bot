@@ -467,12 +467,14 @@ def echo(update: Update, context: CallbackContext) -> None:
                 first_char = message_text[0]
                 if first_char in RATING_COMMANDS.keys():
                     first_char = RATING_COMMANDS[first_char]
+                if m_name[0] == "@":
+                    m_name = m_name[1:]
                 if (message_text) and (first_char in commands.keys()):
                     logger.info("+ @user appreciation detected...")
                     update_rating_routine(update, context, first_char=first_char, 
                             from_user_id=from_user_id, 
                             reply_to_id=None, 
-                            username=m_name[1:])
+                            username=m_name)
                     ## + @user way of appreciataion
             return
 
@@ -491,7 +493,7 @@ def echo(update: Update, context: CallbackContext) -> None:
             if first_char in RATING_COMMANDS.keys():
                 first_char = RATING_COMMANDS[first_char]            
             if first_char in commands.keys():
-                update_rating_routine(update, first_char=first_char, 
+                update_rating_routine(update, context, first_char=first_char, 
                             from_user_id=from_user_id, 
                             reply_to_id=reply_to_id, 
                             username=username, 
