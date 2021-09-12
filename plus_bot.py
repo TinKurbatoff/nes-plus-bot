@@ -23,6 +23,7 @@ from IPython.display import HTML
 import re
 
 import pandas as pd
+from random import randrange
 
 from telegram import Update, ForceReply
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
@@ -341,7 +342,29 @@ def echo_new(update: Update, context: CallbackContext) -> None:
     update.message.reply_text(f"NEW: {update.message.text}")
     return
 
-def update_rating_routine(update, first_char, from_user_id, reply_to_id=None, username=None, first_name=None, last_name=None):
+def get_gif_data():
+    files = []
+    for file in os.listdir("."):
+        if file.endswith(".gif"):
+            files.append(file)
+    new_gif = files[randrange(len(files))] 
+    logger.info(f"-== Used gif file: {new_gif}")
+    animation = open(new_gif, 'rb').read()    
+    return animation
+
+
+def echo_gif(update: Update, context: CallbackContext) -> None:
+    """Echo the user message."""
+
+    context.bot.sendAnimation(chat_id=update.message.chat_id,
+               animation=get_gif_data(),
+               caption='That is your gif!',
+               # parse_mode=ParseMode.MARKDOWN
+               )
+    print("GIF!")
+    return    
+
+def update_rating_routine(update, context, first_char, from_user_id, reply_to_id=None, username=None, first_name=None, last_name=None):
     current_rating = 0
     commands = COMMANDS
     try:
@@ -407,7 +430,14 @@ def update_rating_routine(update, first_char, from_user_id, reply_to_id=None, us
         reply_text = f"{commands[first_char]} one social credit to {first_name}. (@{username}) Total rating: {current_rating}"
         first_name, last_name = get_user_full_name(user_id=reply_to_id)
         update_user_db(user_id=reply_to_id, username=username, first_name=first_name, last_name=last_name)
-        update.message.reply_text(reply_text, quote=False)
+        if current_rating % 25 == 0:
+            # Show with gif
+            context.bot.sendAnimation(chat_id=update.message.chat_id,
+               animation=get_gif_data(),
+               caption=reply_text,)
+        else: 
+            ## Routine as usual
+            update.message.reply_text(reply_text, quote=False)
     except Exception as e:
         logger.error(f"Rating update routine error: {e}")
     return 
@@ -439,7 +469,7 @@ def echo(update: Update, context: CallbackContext) -> None:
                     first_char = RATING_COMMANDS[first_char]
                 if (message_text) and (first_char in commands.keys()):
                     logger.info("+ @user appreciation detected...")
-                    update_rating_routine(update, first_char=first_char, 
+                    update_rating_routine(update, context, first_char=first_char, 
                             from_user_id=from_user_id, 
                             reply_to_id=None, 
                             username=m_name[1:])
@@ -491,6 +521,7 @@ def main() -> None:
     dispatcher.add_handler(CommandHandler("about", about))
     dispatcher.add_handler(CommandHandler("change", change))
     dispatcher.add_handler(CommandHandler("help", help_command))
+    dispatcher.add_handler(CommandHandler("gif", echo_gif))
 
     # on non command i.e message - echo the message on Telegram
     dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, echo))
