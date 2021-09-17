@@ -161,7 +161,8 @@ def get_user_rating(user_id=None, username=None, first_name=None):
             return rating.item() if len(rating) == 1 else 0            
         elif first_name:
             rating = users.loc[users['first_name'] == first_name,'rating']
-            return rating.item() if len(rating) == 1 else 0            
+            return rating.item() if len(rating) == 1 else 0
+
     except Exception as e:
         logger.error(f"ERROR read user database: {e}")
     return 0
@@ -169,29 +170,33 @@ def get_user_rating(user_id=None, username=None, first_name=None):
 def update_user_rating(user_id=None, username=None, first_name=None, rating=None):
     try:
         logger.info(f"update_user_rating| rating: {rating}")
+        logger.info(f"Supplied info: user_id={user_id}, username={username}, first_name={first_name}, rating={rating}")
+        
         users = read_user_database(user_database_file=USER_PANDAS_DATABASE)
+        
+        # logger.info(f"DEBUG {(user_id in users['user_id'].to_list())}")
         ## Update rating        
-        if (user_id in users['user_id'].to_list()):
-            logger.info(f"{user_id} found, change rating")
+        if user_id and (user_id in users['user_id'].to_list()):
+            logger.info(f"by user_id: {user_id} found, change rating")
             users.loc[users['user_id'] == user_id, 'rating'] = rating
             username = users.loc[users['user_id'] == user_id, 'username'].item()
             logger.info(f"Rating in DB updated. By {user_id}: @{username} R={rating}")
 
-        elif (username in users['username'].to_list()):
-            logger.info(f"{username} found, change rating")
-            users.loc[users['username'] == username, 'rating'] =  rating
+        elif username and (username in users['username'].to_list()):
+            logger.info(f"by username: {username} found, change rating")
+            users.loc[users['username'] == username, 'rating'] = rating
             db_user_id = users.loc[users['username'] == username, 'user_id'].item()
             logger.info(f"Rating in DB updated. By @{username}: id {db_user_id} R={rating}")
         
-        elif (first_name in users['first_name'].to_list()):
-            logger.info(f"{username} found, change rating")
+        elif first_name and (first_name in users['first_name'].to_list()):
+            logger.info(f"by first_name: {first_name} found, change rating")
             users.loc[users['first_name'] == first_name, 'rating'] =  rating
             db_user_id = users.loc[users['first_name'] == first_name, 'user_id'].item()
             logger.info(f"Rating in DB updated. By {first_name}: id {db_user_id} R={rating}")
 
         else:
             ## didn't find user
-            logger.info(f"User id:{user_id}|username:{username} not found.")
+            logger.info(f"Fail! User by id:{user_id} / username:{username} — not found.")
             return 0
 
         users.to_pickle(USER_PANDAS_DATABASE, compression="gzip")
@@ -214,16 +219,16 @@ def update_user_db(user_id=None, username=None, first_name=None, last_name=None,
             return 
         
         elif (user_id in users['user_id'].to_list()):
-            logger.info(f"{user_id} found, update user name and full name")
+            logger.info(f"ID: {user_id} found, update user name and full name")
             users.loc[users['user_id'] == user_id, ['username','first_name','last_name']] = [username, first_name, last_name]
-            logger.info(f"Database updated. Records: {len(users)} /{user_id}: @{username}, {first_name} {last_name}/")
+            logger.info(f"Database updated by ID. Records: {len(users)} /{user_id}: @{username}, {first_name} {last_name}/")
             if rating:
                 users.loc[users['user_id'] == user_id, 'rating'] = rating
 
-        elif (username in users['username'].to_list()):
-            logger.info(f"{username} found, update user name and full name")
+        elif (username in users['username'].to_list()) and (username != None):
+            logger.info(f"USERNAME: {username} found, update user name and full name")
             users.loc[users['username'] == username, ['user_id','first_name','last_name']] = [user_id, first_name, last_name]
-            logger.info(f"Database updated. Records: {len(users)} /{user_id}: @{username}, {first_name} {last_name}/")
+            logger.info(f"Database updated by USERNAME. Records: {len(users)} /{user_id}: @{username}, {first_name} {last_name}/")
             if rating:
                 users.loc[users['username'] == username, 'rating'] = rating
 
@@ -319,16 +324,25 @@ def change(update: Update, context: CallbackContext) -> None:
                     for text_part in message_list:
                         if text_part[0] == "@":
                             m_name = text_part[1:]
+                            user_id = None
                             logger.info(f" Tagged: {m_name}")
                             for number_or_not in message_list:
                                 if number_or_not.isdigit():
                                     new_rating = int(number_or_not)
                             break
+                        # print(text_part, len(message_list)) ## ** Sanity check ** 
+                        if (text_part == "/change_id") and (len(message_list) >= 3): ## change by ID
+                            # ['/change_id', '31172036', '229']
+                            if message_list[1].isnumeric() and message_list[2].isnumeric():
+                                user_id = int(message_list[1])
+                                m_name = None
+                                new_rating = int(message_list[2])
+                                break
                     if new_rating:
-                        update.message.reply_text(f'Change rating of {m_name} to {new_rating}.\n')
-                        update_user_rating(username=m_name, rating=new_rating)
+                        update.message.reply_text(f'Change rating of m_name:{m_name} to {new_rating}.\n')
+                        update_user_rating(user_id=user_id, username=m_name, rating=new_rating)
                     else:
-                        update.message.reply_text("Use: /Change @user <rating>")
+                        update.message.reply_text("Use: /Change @user <rating> | /Change_id <id> <rating>")
                 return
         else:
             joke = "It will not change."
@@ -382,6 +396,7 @@ def update_rating_routine(update, context, first_char, from_user_id, reply_to_id
             joke = pyj.get_joke(language = 'en', category = 'chuck')
             update.message.reply_text(f"I like you too...Are you Chuck?\n{joke}")    
             return
+        
         # Read database
         try:
             with open("user_data_base.json","r") as f: database = json.load(f);
@@ -392,7 +407,7 @@ def update_rating_routine(update, context, first_char, from_user_id, reply_to_id
         
         ## Update rating
         # current_rating = database.get(str(reply_to_id),0)            
-        current_rating = get_user_rating(user_id=reply_to_id, username=None, first_name=None)
+        current_rating = get_user_rating(user_id=reply_to_id, username=None, first_name=first_name)
         logger.info(f"Current rating readed: {current_rating} ")
         # last_update = int(database.get(f"{reply_to_id}_update",0))
         logger.info(f"Read: {reply_to_id}, previous rating: {current_rating}")
@@ -424,6 +439,7 @@ def update_rating_routine(update, context, first_char, from_user_id, reply_to_id
         
         ## Write database if everything is okay!
         database[str(reply_to_id)] = current_rating ## update new rating
+        logger.info(f"Trying update user rating of id: {reply_to_id} with {current_rating}...")
         update_user_rating(user_id=reply_to_id, username=None, rating=current_rating)
         with open("user_data_base.json","w") as f: json.dump(database, f);    
         current_rating = int(current_rating)
@@ -504,7 +520,7 @@ def echo(update: Update, context: CallbackContext) -> None:
             logger.info("Note a reply.")
 
     except Exception as e:
-        update.message.reply_text(f"I am not feeling well...\n")
+        update.message.reply_text(f"I am feeling a bit unwell...\n")
         logger.error(f"{e}")
     return
 
@@ -522,6 +538,7 @@ def main() -> None:
     dispatcher.add_handler(CommandHandler("start", start))
     dispatcher.add_handler(CommandHandler("about", about))
     dispatcher.add_handler(CommandHandler("change", change))
+    dispatcher.add_handler(CommandHandler("change_id", change))
     dispatcher.add_handler(CommandHandler("help", help_command))
     dispatcher.add_handler(CommandHandler("gif", echo_gif))
 
