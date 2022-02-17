@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# pylint: disable=C0116,W0613
+# pylint: disable=C0116, W0613
 # This program is dedicated to the public domain under the CC0 license.
 
 """
@@ -17,9 +17,8 @@ import logging
 import json
 import datetime as dt
 import os
-from functools import lru_cache
-
-from IPython.display import HTML
+# from functools import lru_cache
+# from IPython.display import HTML
 import re
 
 import pandas as pd
@@ -31,25 +30,29 @@ from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, Callb
 import pyjokes as pyj
 
 try:
-    with open("bot_key.txt","r") as f:
+    with open("bot_key.txt", "r") as f:
         TOKEN = f.read() 
 except Exception as e:
+    print(f"ERROR open telegram tokens: {e}")
     TOKEN = ""
 
 USER_PANDAS_DATABASE = "users_database.pandas"
-COMMANDS = {"+":"Plus",
-            "-":"Minus"}
+COMMANDS = {"+": "Plus", 
+            "-": "Minus"}
 
 RATING_COMMANDS = {    
-    "👍":"+",
-    "👎":"-",
-    "🙂":"+",
-    "🙁":"-",
+    "👍": "+", 
+    "👎": "-", 
+    "🙂": "+", 
+    "🙁": "-", 
 } 
+
+GIFS_DIR = "./gifs/"
 
 # Enable logging
 logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', 
+    level=logging.INFO
 )
 
 logger = logging.getLogger(__name__)
@@ -92,9 +95,9 @@ width: 700px;
 
 
 def HTML_with_style(df, style=None, random_id=None):
-    from IPython.display import HTML
+    # from IPython.display import HTML
     import numpy as np
-    import re
+    # import re
 
     df_html = df.to_html()
 
@@ -111,61 +114,65 @@ def HTML_with_style(df, style=None, random_id=None):
         new_style = []
         s = re.sub(r'</?style>', '', style).strip()
         for line in s.split('\n'):
-                line = line.strip()
-                if not re.match(r'^table', line):
-                    line = re.sub(r'^', 'table ', line)
-                new_style.append(line)
+            line = line.strip()
+            if not re.match(r'^table', line):
+                line = re.sub(r'^', 'table ', line)
+            new_style.append(line)
         new_style = ['<style>'] + new_style + ['</style>']
 
         style = re.sub(r'table(#\S+)?', 'table#%s' % random_id, '\n'.join(new_style))
 
     df_html = re.sub(r'<table', r'<table id=%s ' % random_id, df_html)
-
     return style + df_html
-
 
 
 # @lru_cache()
 def read_user_database(user_database_file="users_database.pandas"):
-    ## Read or create Database (pandas table)
+    # # Read or create Database (pandas table)
     if os.path.isfile(user_database_file):
         users = pd.read_pickle(user_database_file, compression="gzip")
     else:
         logger.warning(f"No database {user_database_file} is found.")
-        users = pd.DataFrame(columns=['user_id','username','first_name','last_name', 'rating'])
+        users = pd.DataFrame(columns=['user_id', 'username', 'first_name', 'last_name', 'rating'])
     return users
 
+
 def get_user_id(username):
+    """ Gets id from database based on username 
+        if not found returns None
+    """
     users = read_user_database(user_database_file=USER_PANDAS_DATABASE)
-    user_id = users.loc[users['username'] == username,'user_id']
-    user_id = user_id.item() if len(user_id)>0 else None
+    user_id = users.loc[users['username'] == username, 'user_id']
+    user_id = user_id.item() if len(user_id) > 0 else None
     return user_id
 
 
 def get_user_full_name(user_id):
     users = read_user_database(user_database_file=USER_PANDAS_DATABASE)
-    first_name = users.loc[users['user_id'] == user_id,'first_name']
-    last_name = users.loc[users['user_id'] == user_id,'last_name']
-    first_name = first_name.item() if len(first_name)>0 else None
-    last_name = last_name.item() if len(last_name)>0 else None
+    first_name = users.loc[users['user_id'] == user_id, 'first_name']
+    last_name = users.loc[users['user_id'] == user_id, 'last_name']
+    first_name = first_name.item() if len(first_name) > 0 else None
+    last_name = last_name.item() if len(last_name) > 0 else None
     return (first_name, last_name)
+
 
 def get_user_rating(user_id=None, username=None, first_name=None):
     try:
         users = read_user_database(user_database_file=USER_PANDAS_DATABASE)
         if user_id:
-            rating = users.loc[users['user_id'] == user_id,'rating']
+            rating = users.loc[users['user_id'] == user_id, 'rating']
             return rating.item() if len(rating) == 1 else 0
         elif username:
-            rating = users.loc[users['username'] == username,'rating']
+            rating = users.loc[users['username'] == username, 'rating']
             return rating.item() if len(rating) == 1 else 0            
         elif first_name:
-            rating = users.loc[users['first_name'] == first_name,'rating']
+            rating = users.loc[users['first_name'] == first_name, 'rating']
             return rating.item() if len(rating) == 1 else 0
 
     except Exception as e:
         logger.error(f"ERROR read user database: {e}")
     return 0
+
 
 def update_user_rating(user_id=None, username=None, first_name=None, rating=None):
     try:
@@ -175,7 +182,7 @@ def update_user_rating(user_id=None, username=None, first_name=None, rating=None
         users = read_user_database(user_database_file=USER_PANDAS_DATABASE)
         
         # logger.info(f"DEBUG {(user_id in users['user_id'].to_list())}")
-        ## Update rating        
+        # # Update rating        
         if user_id and (user_id in users['user_id'].to_list()):
             logger.info(f"by user_id: {user_id} found, change rating")
             users.loc[users['user_id'] == user_id, 'rating'] = rating
@@ -190,12 +197,12 @@ def update_user_rating(user_id=None, username=None, first_name=None, rating=None
         
         elif first_name and (first_name in users['first_name'].to_list()):
             logger.info(f"by first_name: {first_name} found, change rating")
-            users.loc[users['first_name'] == first_name, 'rating'] =  rating
+            users.loc[users['first_name'] == first_name, 'rating'] = rating
             db_user_id = users.loc[users['first_name'] == first_name, 'user_id'].item()
             logger.info(f"Rating in DB updated. By {first_name}: id {db_user_id} R={rating}")
 
         else:
-            ## didn't find user
+            # # didn't find user
             logger.info(f"Fail! User by id:{user_id} / username:{username} — not found.")
             return 0
 
@@ -212,7 +219,7 @@ def update_user_db(user_id=None, username=None, first_name=None, last_name=None,
     try:
         users = read_user_database(USER_PANDAS_DATABASE)
 
-        ## Update Database 
+        # # Update Database 
         if (user_id in users['user_id'].to_list()) and (username in users['username'].to_list()):
             # Already updated
             logger.info(f"{user_id} found in DB. Records: {len(users)}. No update.")
@@ -220,21 +227,23 @@ def update_user_db(user_id=None, username=None, first_name=None, last_name=None,
         
         elif (user_id in users['user_id'].to_list()):
             logger.info(f"ID: {user_id} found, update user name and full name")
-            users.loc[users['user_id'] == user_id, ['username','first_name','last_name']] = [username, first_name, last_name]
+            users.loc[users['user_id'] == user_id, ['username', 'first_name', 'last_name']] = [username, first_name, last_name]
             logger.info(f"Database updated by ID. Records: {len(users)} /{user_id}: @{username}, {first_name} {last_name}/")
             if rating:
                 users.loc[users['user_id'] == user_id, 'rating'] = rating
 
-        elif (username in users['username'].to_list()) and (username != None):
+        elif (username in users['username'].to_list()) and (username is not None):
             logger.info(f"USERNAME: {username} found, update user name and full name")
-            users.loc[users['username'] == username, ['user_id','first_name','last_name']] = [user_id, first_name, last_name]
+            users.loc[users['username'] == username, ['user_id', 'first_name', 'last_name']] = [user_id, first_name, last_name]
             logger.info(f"Database updated by USERNAME. Records: {len(users)} /{user_id}: @{username}, {first_name} {last_name}/")
             if rating:
                 users.loc[users['username'] == username, 'rating'] = rating
 
         else:
-            users.loc[len(users),:] = [user_id, username, first_name, last_name, 0]
-
+            # Create a new row in the database (new user)
+            logger.info(f"[New user in DB] id:{user_id} username:{username} | {first_name} {last_name} | rating {rating}.")
+            users.loc[len(users), :] = [len(users)+1, user_id, username, first_name, last_name, 1]
+            users['index'] = users['index'].fillna(0).astype(int)
 
         users.to_pickle(USER_PANDAS_DATABASE, compression="gzip")
         logger.info(f"Database updated. Records: {len(users)} /{user_id}: @{username}, {first_name} {last_name}/")
@@ -243,15 +252,14 @@ def update_user_db(user_id=None, username=None, first_name=None, last_name=None,
     return
 
 
-
 # Define a few command handlers. These usually take the two arguments update and
 # context.
 def start(update: Update, context: CallbackContext) -> None:
     """Send a message when the command /start is issued."""
     user = update.effective_user
     update.message.reply_markdown_v2(
-        fr'Hi {user.mention_markdown_v2()}\!',
-        reply_markup=ForceReply(selective=True),
+        fr'Hi {user.mention_markdown_v2()}\!', 
+        reply_markup=ForceReply(selective=True), 
     )
 
 
@@ -259,18 +267,19 @@ def help_command(update: Update, context: CallbackContext) -> None:
     """Send a message when the command /help is issued."""
     update.message.reply_text('Help!')
 
+
 def about(update: Update, context: CallbackContext) -> None:
     """Send a message when the command /help is issued."""
     # joke = pyj.get_joke(language = 'en', category = 'all')
-    from_user = getattr(update.message,'from_user', None)
-    entities = getattr(update.message,'entities', [])
+    from_user = getattr(update.message, 'from_user', None)
+    entities = getattr(update.message, 'entities', [])
     logger.info(f"/About called by {from_user}.")
-    username = getattr(from_user,'username', None)
-    if len(entities)>0:
-        ## INFO: https://core.telegram.org/bots/api#messageentity
+    username = getattr(from_user, 'username', None)
+    if len(entities) > 0:
+        # # INFO: https://core.telegram.org/bots/api#messageentity
         logger.info(f"Entities: {update.message.entities[0]}")
         if update.message.entities[0]['type'] == 'bot_command':
-            message_full = getattr(update.message,'text', None)
+            message_full = getattr(update.message, 'text', None)
             message_list = message_full.split(" ")
             logger.info(f"message_list: {message_list}")
             rating = None
@@ -291,12 +300,12 @@ def about(update: Update, context: CallbackContext) -> None:
         users = read_user_database(USER_PANDAS_DATABASE)
         # joke = HTML_with_style(users, '<style>table {{{}}}</style>'.format(my_style))
         # split dataframe on parts by 30 records
-        for part in range(1, len(users)//30+2):
-            from_line = part*30-30
-            to_line = part*30
+        for part in range(1, (len(users) // 30) + 2):
+            from_line = part * 30-30
+            to_line = part * 30
             logger.info(f"==== PART {part} ====")
             logger.info(f"lines from {from_line} to {to_line}")
-            users_part = users.iloc[from_line:to_line,:].to_string(header=True, index=False)
+            users_part = users.iloc[from_line:to_line, :].to_string(header=True, index=False)
             update.message.reply_text(f"==== PART {part} ====\nfrom {from_line} to {to_line}\n{users_part}")
         return
     else:
@@ -304,20 +313,21 @@ def about(update: Update, context: CallbackContext) -> None:
         update.message.reply_text(f'I like jokes.\n{joke}')
         return
 
+
 def change(update: Update, context: CallbackContext) -> None:
     """Send a message when the command /help is issued."""
     # joke = pyj.get_joke(language = 'en', category = 'all')
     try:
-        reply_list = getattr(update.message,'from_user', None)
+        reply_list = getattr(update.message, 'from_user', None)
         logger.info(f"/Change called by {reply_list}.")
-        caller_username = getattr(reply_list,'username', None)
+        caller_username = getattr(reply_list, 'username', None)
         if caller_username == 'banknote2000':
             # update.message.reply_text(f'Change rating.\n')
-            if len(update.message.entities)>0:
-                ## INFO: https://core.telegram.org/bots/api#messageentity
+            if len(update.message.entities) > 0:
+                # # INFO: https://core.telegram.org/bots/api#messageentity
                 logger.info(f"Entities: {update.message.entities[0]}")
                 if update.message.entities[0]['type'] == 'bot_command':
-                    message_full = getattr(update.message,'text', None)
+                    message_full = getattr(update.message, 'text', None)
                     message_list = message_full.split(" ")
                     logger.info(f"message_list: {message_list}")
                     new_rating = None
@@ -331,7 +341,7 @@ def change(update: Update, context: CallbackContext) -> None:
                                     new_rating = int(number_or_not)
                             break
                         # print(text_part, len(message_list)) ## ** Sanity check ** 
-                        if (text_part == "/change_id") and (len(message_list) >= 3): ## change by ID
+                        if (text_part == "/change_id") and (len(message_list) >= 3):  # # change by ID
                             # ['/change_id', '31172036', '229']
                             if message_list[1].isnumeric() and message_list[2].isnumeric():
                                 user_id = int(message_list[1])
@@ -351,40 +361,49 @@ def change(update: Update, context: CallbackContext) -> None:
         logger.error(f"Rating /change function error: {e}")
     return 
 
+
 def echo_new(update: Update, context: CallbackContext) -> None:
     """Echo the user message."""
     update.message.reply_text(f"NEW: {update.message.text}")
     return
 
+
 def get_gif_data():
     files = []
-    for file in os.listdir("."):
+    for file in os.listdir(GIFS_DIR):
         if file.endswith(".gif"):
             files.append(file)
     new_gif = files[randrange(len(files))] 
     logger.info(f"-== Used gif file: {new_gif}")
-    animation = open(new_gif, 'rb').read()    
+    logger.info(f"PATH: {GIFS_DIR + new_gif}")
+    animation = open(GIFS_DIR + new_gif, 'rb').read()    
     return animation
 
 
 def echo_gif(update: Update, context: CallbackContext) -> None:
     """Echo the user message."""
 
-    context.bot.sendAnimation(chat_id=update.message.chat_id,
-               animation=get_gif_data(),
-               caption='That is your gif!',
-               # parse_mode=ParseMode.MARKDOWN
-               )
+    context.bot.sendAnimation(chat_id=update.message.chat_id, 
+                              animation=get_gif_data(), 
+                              caption='That is your gif!', 
+                              #    parse_mode=ParseMode.MARKDOWN
+                              )
     print("GIF!")
     return    
+
 
 def update_rating_routine(update, context, first_char, from_user_id, reply_to_id=None, username=None, first_name=None, last_name=None):
     current_rating = 0
     commands = COMMANDS
     try:
-        if reply_to_id == None:
+        if reply_to_id is None:
             # current_rating = get_user_rating(user_id=None, username=username, first_name=None)
+            try:
+                logger.info(f"update.effective_user.username: {update.effective_user.username}")
+            except Exception as e:
+                logger.warning(f"cannot process update.effective_user.username: {e}")
             reply_to_id = get_user_id(username=username)
+            logger.info(f"reply_to_id detected: {reply_to_id}")
             first_name, last_name = get_user_full_name(reply_to_id)        
 
         if reply_to_id == 1968168927:
@@ -393,66 +412,77 @@ def update_rating_routine(update, context, first_char, from_user_id, reply_to_id
             return
         if reply_to_id == from_user_id:
             # Self "plus"-ing
-            joke = pyj.get_joke(language = 'en', category = 'chuck')
+            joke = pyj.get_joke(language='en', category='chuck')
             update.message.reply_text(f"I like you too...Are you Chuck?\n{joke}")    
             return
         
         # Read database
         try:
-            with open("user_data_base.json","r") as f: database = json.load(f);
+            with open("user_data_base.json", "r") as f:
+                database = json.load(f)
         except Exception as e:
             logger.error(f"{e}")
-            database = {1968168927:0}
+            database = {1968168927: 0}
         # print(database.items())
         
-        ## Update rating
-        # current_rating = database.get(str(reply_to_id),0)            
-        current_rating = get_user_rating(user_id=reply_to_id, username=None, first_name=first_name)
+        # # Update rating
+        # current_rating = database.get(str(reply_to_id), 0)            
+        if reply_to_id is None:
+            logger.warning("No ID found! Looking by username")
+            current_rating = get_user_rating(user_id=None, username=username, first_name=first_name)
+        else:
+            current_rating = get_user_rating(user_id=reply_to_id, username=None, first_name=first_name)
         logger.info(f"Current rating readed: {current_rating} ")
-        # last_update = int(database.get(f"{reply_to_id}_update",0))
+        # last_update = int(database.get(f"{reply_to_id}_update", 0))
         logger.info(f"Read: {reply_to_id}, previous rating: {current_rating}")
         current_rating = eval(f"{current_rating}{first_char}1")
         
-        ## —— Make a delay 
-        current_time = int(dt.datetime.utcnow().strftime('%s')) # Time Now
+        # # —— Make a delay 
+        current_time = int(dt.datetime.utcnow().strftime('%s'))  # Time Now
         try:
-            with open("recent_appreciations.json", "r+") as f: recents = json.load(f);
+            with open("recent_appreciations.json", "r+") as f:
+                recents = json.load(f)
         except Exception as e:
             logger.error(f"{e}")
             recents = {}
-        ## filter out old appreciations (>60 sec)
-        new_recents = {k:v for k,v in recents.items() if (current_time-int(k)) <= 60}
+        # # filter out old appreciations (>60 sec)
+        new_recents = {k: v for k, v in recents.items() if (current_time-int(k)) <= 15}
         
         # Search for a users pair in recent appreiations
-        for k,v in new_recents.items():
+        for k, v in new_recents.items():
             if (str(from_user_id) in v.keys()) and (reply_to_id == v.get(str(from_user_id), None)):
                 update.message.reply_text("Wait a little!")
                 logger.info(f"Not updated: {from_user_id}->{reply_to_id} => Pause difference: {current_time-int(k)}")
                 return
 
-        ## add a new appreciation to stack
+        # # add a new appreciation to stack
         if current_time not in new_recents.keys():
             new_recents[current_time] = {}
         new_recents[current_time][from_user_id] = reply_to_id
-        with open("recent_appreciations.json", "w") as f: recents = json.dump(new_recents,f);
-        ## ——
+        with open("recent_appreciations.json", "w") as f: 
+            recents = json.dump(new_recents, f)
+        # # ——
         
-        ## Write database if everything is okay!
-        database[str(reply_to_id)] = current_rating ## update new rating
+        # # Write database if everything is okay!
+        database[str(reply_to_id)] = current_rating  # # update new rating
         logger.info(f"Trying update user rating of id: {reply_to_id} with {current_rating}...")
-        update_user_rating(user_id=reply_to_id, username=None, rating=current_rating)
-        with open("user_data_base.json","w") as f: json.dump(database, f);    
+        if reply_to_id is None:
+            update_user_rating(user_id=None, username=username, rating=current_rating)
+        else:
+            update_user_rating(user_id=reply_to_id, username=None, rating=current_rating)
+        with open("user_data_base.json", "w") as f:
+            json.dump(database, f)
         current_rating = int(current_rating)
         reply_text = f"{commands[first_char]} one social credit to {first_name}. (@{username}) Total rating: {current_rating}"
         first_name, last_name = get_user_full_name(user_id=reply_to_id)
         update_user_db(user_id=reply_to_id, username=username, first_name=first_name, last_name=last_name)
         if current_rating % 25 == 0:
             # Show with gif
-            context.bot.sendAnimation(chat_id=update.message.chat_id,
-               animation=get_gif_data(),
-               caption=reply_text,)
+            context.bot.sendAnimation(chat_id=update.message.chat_id, 
+                                      animation=get_gif_data(), 
+                                      caption=reply_text, )
         else: 
-            ## Routine as usual
+            # # Routine as usual
             update.message.reply_text(reply_text, quote=False)
     except Exception as e:
         logger.error(f"Rating update routine error: {e}")
@@ -463,67 +493,71 @@ def echo(update: Update, context: CallbackContext) -> None:
     """Echo the user message."""
     commands = COMMANDS
     try:
-        from_user = getattr(update.message,'from_user', None)
-        from_user_id = getattr(from_user,'id', None)
-        if not getattr(update,'message', None):
+        from_user = getattr(update.message, 'from_user', None)
+        from_user_id = getattr(from_user, 'id', None)
+        if not getattr(update, 'message', None):
             logger.warning("Empty message")
             return
-        reply = getattr(update.message.reply_to_message,'from_user', None)
+        reply = getattr(update.message.reply_to_message, 'from_user', None)
         with open("telgram_messages.txt", "a") as f:
             f.write(f"From_user:{from_user} from_user_id:{from_user_id} | Chat: '{update.message.chat['title']}' TEXT:'{update.message.text}'\n")
         # logger.info(f"echo, from_user:{from_user} from_user_id:{from_user_id} TEXT:{update.message.text}")
-        if len(update.message.entities)>0:
-            ## INFO: https://core.telegram.org/bots/api#messageentity
+        if len(update.message.entities) > 0:
+            # # INFO: https://core.telegram.org/bots/api#messageentity
             logger.info(update.message.entities[0])
             if update.message.entities[0]['type'] == 'mention':
-                x,y = update.message.entities[0]['offset'],update.message.entities[0]['length']
+                x, y = update.message.entities[0]['offset'], update.message.entities[0]['length']
                 m_name = update.message.text[x:x+y]
                 logger.info(f" Tagged: {m_name}")
-                message_text = getattr(update.message,'text',None)
+                message_text = getattr(update.message, 'text', None)
                 first_char = message_text[0]
                 if first_char in RATING_COMMANDS.keys():
                     first_char = RATING_COMMANDS[first_char]
                 if m_name[0] == "@":
                     m_name = m_name[1:]
                 if (message_text) and (first_char in commands.keys()):
-                    logger.info("+ @user appreciation detected...")
-                    update_rating_routine(update, context, first_char=first_char, 
-                            from_user_id=from_user_id, 
-                            reply_to_id=None, 
-                            username=m_name)
-                    ## + @user way of appreciataion
+                    logger.info(f"+ username:{m_name} appreciation detected...")
+                    update_rating_routine(update, 
+                                          context, 
+                                          first_char=first_char, 
+                                          from_user_id=from_user_id, 
+                                          reply_to_id=None, 
+                                          username=m_name)
+                    # # + @user way of appreciataion
             return
 
             # for k in dir(update.message.entities[0]):
             #     if k[0] != "_":
-            #         logger.info(f'{k}:{getattr(update.message.entities,k, "<▒▒▒▒▒▒▒▒▒>")}')
+            #         logger.info(f'{k}:{getattr(update.message.entities, k, "<▒▒▒▒▒▒▒▒▒>")}')
         if reply:
-            ## React only to replies...
-            reply_to_id = getattr(update.message.reply_to_message.from_user,'id', None)
-            username = getattr(update.message.reply_to_message.from_user,'username', None)
-            first_name = getattr(update.message.reply_to_message.from_user,'first_name',None)
-            last_name = getattr(update.message.reply_to_message.from_user,'last_name',None)
+            # # React only to replies...
+            reply_to_id = getattr(update.message.reply_to_message.from_user, 'id', None)
+            username = getattr(update.message.reply_to_message.from_user, 'username', None)
+            first_name = getattr(update.message.reply_to_message.from_user, 'first_name', None)
+            last_name = getattr(update.message.reply_to_message.from_user, 'last_name', None)
             update_user_db(user_id=reply_to_id, username=username, first_name=first_name, last_name=last_name)
             logger.info(f"Reply to ID:{reply_to_id}, @{username} Name: {first_name} {last_name}")
             first_char = update.message.text[0]
             if first_char in RATING_COMMANDS.keys():
                 first_char = RATING_COMMANDS[first_char]            
             if first_char in commands.keys():
-                update_rating_routine(update, context, first_char=first_char, 
-                            from_user_id=from_user_id, 
-                            reply_to_id=reply_to_id, 
-                            username=username, 
-                            first_name=first_name, last_name=last_name)
+                update_rating_routine(update, 
+                                      context, 
+                                      first_char=first_char, 
+                                      from_user_id=from_user_id, 
+                                      reply_to_id=reply_to_id, 
+                                      username=username, 
+                                      first_name=first_name, 
+                                      last_name=last_name)
                 # update_rating_routine(update, first_char, from_user_id, reply_to_id)
                 return
         else:
             logger.info("Note a reply.")
 
     except Exception as e:
-        update.message.reply_text(f"I am feeling a bit unwell...\n")
+        update.message.reply_text("I am feeling a bit unwell...\n")
         logger.error(f"{e}")
     return
-
 
 
 def main() -> None:
@@ -553,7 +587,7 @@ def main() -> None:
     # Start the Bot
     updater.start_polling()
 
-    # Run the bot until you press Ctrl-C or the process receives SIGINT,
+    # Run the bot until you press Ctrl-C or the process receives SIGINT, 
     # SIGTERM or SIGABRT. This should be used most of the time, since
     # start_polling() is non-blocking and will stop the bot gracefully.
     updater.idle()
